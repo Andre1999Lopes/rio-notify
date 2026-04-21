@@ -1,0 +1,75 @@
+services:
+  api:
+    build: .
+    container_name: rionotify-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - PORT=${PORT}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - PEPPER=${PEPPER}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENV=${ENV}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/tmp
+    networks:
+      - rionotify-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: rionotify-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rionotify
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - rionotify-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: rionotify-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - rionotify-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  rionotify-network:
+    driver: bridge
