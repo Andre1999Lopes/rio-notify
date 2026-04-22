@@ -14,6 +14,8 @@ import (
 	"rio-notify/internal/crypto"
 	"rio-notify/internal/database"
 	"rio-notify/internal/logger"
+	"rio-notify/internal/middleware"
+	"rio-notify/internal/webhook"
 )
 
 func main() {
@@ -86,6 +88,16 @@ func main() {
 
 	router.GET("/health", healthHandler(db, redis, log))
 
+	webhookSecret := os.Getenv("WEBHOOK_SECRET")
+	if webhookSecret == "" {
+		log.Error("WEBHOOK_SECRET não definido")
+		os.Exit(1)
+	}
+
+	webhookRepo := webhook.NewWebhookRepository(db, log)
+	webhookService := webhook.NewWebhookService(webhookRepo, redis, hasher, log)
+	webhookHandler := webhook.NewWebhookHandler(webhookService, log)
+
 	api := router.Group("/api/v1")
 	{
 		api.GET("/notifications", func(c *gin.Context) {
@@ -107,11 +119,10 @@ func main() {
 		})
 	}
 
-	router.POST("/webhook", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "A ser implementado",
-		})
-	})
+	router.POST("/webhook",
+		middleware.HMACValidation(webhookSecret, log),
+		webhookHandler.HandleWebhook,
+	)
 
 	router.GET("/ws", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{

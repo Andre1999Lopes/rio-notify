@@ -5,7 +5,11 @@ default:
     @just --list
 
 run:
-    docker compose up -d
+    docker compose up --build -d
+
+restart:
+    docker compose down
+    docker compose up --build -d
 
 down:
     docker compose down
@@ -30,9 +34,6 @@ fmt:
 
 tidy:
     go mod tidy
-
-build:
-    docker build -t rio-notify .
 
 status:
     docker compose ps

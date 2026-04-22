@@ -59,16 +59,16 @@ func (l *Logger) WithError(err error) *slog.Logger {
 	return l.With("error", err.Error())
 }
 
-func (l *Logger) WithRequestID(requestId string) *slog.Logger {
-	return l.With("request_id", requestId)
+func (l *Logger) WithRequestID(requestID string) *slog.Logger {
+	return l.With("request_id", requestID)
 }
 
 func (l *Logger) WithUser(userHash string) *slog.Logger {
 	return l.With("user_hash", userHash)
 }
 
-func (l *Logger) WithCallId(callId string) *slog.Logger {
-	return l.With("call_id", callId)
+func (l *Logger) WithCallID(callID string) *slog.Logger {
+	return l.With("call_id", callID)
 }
 
 func (l *Logger) Debug(msg string, args ...any) {
