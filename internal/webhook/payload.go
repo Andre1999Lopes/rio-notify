@@ -5,9 +5,9 @@ import (
 )
 
 type WebhookPayload struct {
-	ChamadoID      string    `json:"chamado_id" binding:"required"`
+	ChamadoId      string    `json:"chamado_id" binding:"required"`
 	Tipo           string    `json:"tipo" binding:"required"`
-	CPF            string    `json:"cpf" binding:"required"`
+	Cpf            string    `json:"cpf" binding:"required"`
 	StatusAnterior *string   `json:"status_anterior"`
 	StatusNovo     string    `json:"status_novo" binding:"required"`
 	Titulo         string    `json:"titulo" binding:"required"`

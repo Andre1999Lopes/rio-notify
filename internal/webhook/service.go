@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,10 +12,10 @@ import (
 )
 
 type WebhookService struct {
-	repo   *WebhookRepository
-	redis  *database.RedisClient
-	hasher *crypto.Hasher
-	logger *logger.Logger
+	repository *WebhookRepository
+	redis      *database.RedisClient
+	hasher     *crypto.Hasher
+	logger     *logger.Logger
 }
 
 func NewWebhookService(
@@ -24,62 +25,93 @@ func NewWebhookService(
 	log *logger.Logger,
 ) *WebhookService {
 	return &WebhookService{
-		repo:   repo,
-		redis:  redis,
-		hasher: hasher,
-		logger: log,
+		repository: repo,
+		redis:      redis,
+		hasher:     hasher,
+		logger:     log,
 	}
 }
 
-func (s *WebhookService) IsDuplicate(ctx context.Context, callID, statusNew string) bool {
-	key := s.buildIdempotencyKey(callID, statusNew)
-	exists, err := s.redis.Exists(ctx, key)
+func (service *WebhookService) IsDuplicate(ctx context.Context, callId, statusNew string) bool {
+	key := service.buildIdempotencyKey(callId, statusNew)
+	service.logger.Info("🔍 Verificando idempotência",
+		"key", key,
+	)
+	exists, err := service.redis.Exists(ctx, key)
+
 	if err != nil {
-		s.logger.Warn("Falha ao verificar idempotência no Redis",
+		service.logger.Warn("Falha ao verificar idempotência no Redis",
 			"key", key,
 			"error", err,
 		)
 		return false
 	}
+
+	service.logger.Info("🔍 Resultado Exists",
+		"key", key,
+		"exists", exists,
+	)
+
 	return exists
 }
 
-func (s *WebhookService) MarkAsProcessed(ctx context.Context, callID, statusNew string) {
-	key := s.buildIdempotencyKey(callID, statusNew)
-	if err := s.redis.Set(ctx, key, "1", 5*time.Minute); err != nil {
-		s.logger.Warn("Falha ao marcar evento no Redis",
+func (service *WebhookService) MarkAsProcessed(ctx context.Context, callId, statusNew string) {
+	key := service.buildIdempotencyKey(callId, statusNew)
+
+	if err := service.redis.Set(ctx, key, "1", 5*time.Minute); err != nil {
+		service.logger.Warn("Falha ao marcar evento no Redis",
 			"key", key,
 			"error", err,
 		)
 	}
 }
 
-func (s *WebhookService) ProcessWebhook(ctx context.Context, payload WebhookPayload) error {
-	userHash := s.hasher.HashCPF(payload.CPF)
-
+func (service *WebhookService) ProcessWebhook(ctx context.Context, payload WebhookPayload) (string, error) {
+	userHash := service.hasher.HashCpf(payload.Cpf)
 	params := CreateNotificationParams{
 		UserHash:       userHash,
-		CallID:         payload.ChamadoID,
+		CallId:         payload.ChamadoId,
 		Title:          payload.Titulo,
 		Description:    payload.Descricao,
 		StatusOld:      payload.StatusAnterior,
 		StatusNew:      payload.StatusNovo,
 		EventTimestamp: payload.Timestamp,
 	}
-
-	return s.repo.Create(ctx, params)
+	return service.repository.Create(ctx, params)
 }
 
-func (s *WebhookService) buildIdempotencyKey(callID, statusNew string) string {
-	return fmt.Sprintf("event:%s:%s", callID, statusNew)
+func (service *WebhookService) buildIdempotencyKey(callId, statusNew string) string {
+	return fmt.Sprintf("event:%s:%s", callId, statusNew)
 }
 
-func (s *WebhookService) PublishToRedis(ctx context.Context, payload WebhookPayload) {
-	userHash := s.hasher.HashCPF(payload.CPF)
+func (service *WebhookService) PublishToRedis(ctx context.Context, notificationId string, payload WebhookPayload) {
+	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	userHash := service.hasher.HashCpf(payload.Cpf)
 	channel := fmt.Sprintf("user:%s", userHash)
 
-	s.logger.Debug("Publicando no Redis Pub/Sub",
-		"channel", channel,
-		"call_id", payload.ChamadoID,
-	)
+	notificationJson, err := json.Marshal(map[string]any{
+		"id":              notificationId,
+		"chamado_id":      payload.ChamadoId,
+		"titulo":          payload.Titulo,
+		"descricao":       payload.Descricao,
+		"status_anterior": payload.StatusAnterior,
+		"status_novo":     payload.StatusNovo,
+		"data_evento":     payload.Timestamp,
+		"lida":            false,
+	})
+
+	if err != nil {
+		service.logger.Error("Falha ao serializar notificação para Redis",
+			"error", err,
+		)
+		return
+	}
+
+	if err := service.redis.Publish(publishCtx, channel, notificationJson); err != nil {
+		service.logger.Error("Falha ao publicar no Redis Pub/Sub",
+			"channel", channel,
+			"error", err,
+		)
+	}
 }

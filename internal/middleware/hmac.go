@@ -14,9 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func HMACValidation(secret string, log *logger.Logger) gin.HandlerFunc {
+func HmacValidation(secret string, log *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		signatureHeader := c.GetHeader("X-Signature-256")
+
 		if signatureHeader == "" {
 			log.Warn("Webhook sem assinatura",
 				"path", c.Request.URL.Path,
@@ -54,6 +55,7 @@ func HMACValidation(secret string, log *logger.Logger) gin.HandlerFunc {
 		}
 
 		bodyBytes, err := io.ReadAll(c.Request.Body)
+
 		if err != nil {
 			log.Error("Falha ao ler body do webhook",
 				"erro", err,
@@ -66,11 +68,9 @@ func HMACValidation(secret string, log *logger.Logger) gin.HandlerFunc {
 		}
 
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 		h := hmac.New(sha256.New, []byte(secret))
 		h.Write(bodyBytes)
 		expectedHash := hex.EncodeToString(h.Sum(nil))
-
 		log.Warn("🔍 DEBUG HMAC",
 			"received", receivedHash,
 			"expected", expectedHash,

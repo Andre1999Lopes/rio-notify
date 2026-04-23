@@ -26,8 +26,8 @@ func NewHasher(pepper string, logger *logger.Logger) (*Hasher, error) {
 	}, nil
 }
 
-func (h *Hasher) HashCPF(cpf string) string {
-	cpf = cleanCPF(cpf)
+func (h *Hasher) HashCpf(cpf string) string {
+	cpf = cleanCpf(cpf)
 
 	data := cpf + ":" + h.pepper
 	hash := sha256.Sum256([]byte(data))
@@ -35,28 +35,45 @@ func (h *Hasher) HashCPF(cpf string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func cleanCPF(cpf string) string {
+func cleanCpf(cpf string) string {
 	re := regexp.MustCompile(`[^0-9]`)
 	return re.ReplaceAllString(cpf, "")
 }
 
-func (h *Hasher) ValidateCPF(cpf string) bool {
-	cleaned := cleanCPF(cpf)
+func (h *Hasher) ValidateCpf(cpf string) bool {
+	cleaned := cleanCpf(cpf)
 
 	if len(cleaned) != 11 {
-		h.logger.Debug("CPF com tamanho inválido",
-			"tamanho", len(cleaned),
-			"esperado", 11,
-		)
 		return false
 	}
 
 	if isAllSameDigits(cleaned) {
-		h.logger.Debug("CPF com todos dígitos iguais")
 		return false
 	}
 
-	return true
+	return validateDigits(cleaned)
+}
+
+func validateDigits(cpf string) bool {
+	sum := 0
+	for i := range 9 {
+		sum += int(cpf[i]-'0') * (10 - i)
+	}
+	d1 := (sum * 10) % 11
+	if d1 == 10 {
+		d1 = 0
+	}
+
+	sum = 0
+	for i := range 10 {
+		sum += int(cpf[i]-'0') * (11 - i)
+	}
+	d2 := (sum * 10) % 11
+	if d2 == 10 {
+		d2 = 0
+	}
+
+	return int(cpf[9]-'0') == d1 && int(cpf[10]-'0') == d2
 }
 
 func isAllSameDigits(s string) bool {
@@ -69,8 +86,8 @@ func isAllSameDigits(s string) bool {
 	return true
 }
 
-func MaskCPF(cpf string) string {
-	cleaned := cleanCPF(cpf)
+func MaskCpf(cpf string) string {
+	cleaned := cleanCpf(cpf)
 	if len(cleaned) != 11 {
 		return "***"
 	}
@@ -78,5 +95,5 @@ func MaskCPF(cpf string) string {
 }
 
 func (h *Hasher) VerifyHash(cpf, hash string) bool {
-	return h.HashCPF(cpf) == hash
+	return h.HashCpf(cpf) == hash
 }

@@ -17,7 +17,7 @@ import (
 
 type PostgresDB struct {
 	*pgxpool.Pool
-	logger *logger.Logger // ✅ Seu logger personalizado
+	logger *logger.Logger
 }
 
 type PostgresConfig struct {
@@ -38,8 +38,9 @@ func DefaultConfig() PostgresConfig {
 	}
 }
 
-func NewPostgresDB(ctx context.Context, databaseURL string, log *logger.Logger) (*PostgresDB, error) {
+func NewPostgresDb(ctx context.Context, databaseURL string, log *logger.Logger) (*PostgresDB, error) {
 	config, err := pgxpool.ParseConfig(databaseURL)
+
 	if err != nil {
 		log.Error("Falha ao fazer parse da URL do banco", "error", err, "url", databaseURL)
 		return nil, errors.New("failed to parse database URL")
@@ -51,8 +52,8 @@ func NewPostgresDB(ctx context.Context, databaseURL string, log *logger.Logger) 
 	config.MaxConnLifetime = poolConfig.MaxConnLifetime
 	config.MaxConnIdleTime = poolConfig.MaxConnIdleTime
 	config.HealthCheckPeriod = poolConfig.HealthCheckPeriod
-
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+
 	if err != nil {
 		log.Error("Falha ao criar pool de conexões", "error", err)
 		return nil, errors.New("failed to create connection pool")
@@ -85,6 +86,7 @@ func (db *PostgresDB) Health(ctx context.Context) error {
 		db.logger.Error("Health check do PostgreSQL falhou", "error", err)
 		return errors.New("database health check failed")
 	}
+
 	return nil
 }
 
@@ -98,6 +100,7 @@ func RunMigrations(ctx context.Context, db *PostgresDB) error {
 	}
 
 	files, err := fs.ReadDir(migrationFiles, "migrations")
+
 	if err != nil {
 		db.logger.Error("Falha ao ler diretório de migrations", "error", err)
 		return errors.New("failed to read migrations directory")
@@ -106,16 +109,16 @@ func RunMigrations(ctx context.Context, db *PostgresDB) error {
 	sort.Slice(files, func(i, j int) bool {
 		return files[i].Name() < files[j].Name()
 	})
-
 	executed := 0
+
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".sql") {
 			continue
 		}
 
 		version := file.Name()
-
 		alreadyExecuted, err := isMigrationExecuted(ctx, db, version)
+
 		if err != nil {
 			db.logger.Error("Falha ao verificar status da migration",
 				"version", version,
@@ -130,6 +133,7 @@ func RunMigrations(ctx context.Context, db *PostgresDB) error {
 		}
 
 		content, err := migrationFiles.ReadFile("migrations/" + version)
+
 		if err != nil {
 			db.logger.Error("Falha ao ler arquivo de migration",
 				"version", version,
@@ -167,10 +171,12 @@ func createMigrationsTable(ctx context.Context, db *PostgresDB) error {
 		)
 	`
 	_, err := db.Exec(ctx, query)
+
 	if err != nil {
 		db.logger.Error("Falha ao executar query de criação da tabela schema_migrations", "error", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -178,6 +184,7 @@ func isMigrationExecuted(ctx context.Context, db *PostgresDB, version string) (b
 	var count int
 	query := `SELECT COUNT(*) FROM schema_migrations WHERE version = $1`
 	err := db.QueryRow(ctx, query, version).Scan(&count)
+
 	if err != nil {
 		db.logger.Error("Falha ao consultar schema_migrations",
 			"version", version,
@@ -190,6 +197,7 @@ func isMigrationExecuted(ctx context.Context, db *PostgresDB, version string) (b
 
 func executeMigration(ctx context.Context, db *PostgresDB, version, sqlContent string) error {
 	tx, err := db.Begin(ctx)
+
 	if err != nil {
 		db.logger.Error("Falha ao iniciar transação para migration",
 			"version", version,
@@ -197,6 +205,7 @@ func executeMigration(ctx context.Context, db *PostgresDB, version, sqlContent s
 		)
 		return err
 	}
+
 	defer tx.Rollback(ctx)
 
 	if _, err := tx.Exec(ctx, sqlContent); err != nil {
@@ -208,6 +217,7 @@ func executeMigration(ctx context.Context, db *PostgresDB, version, sqlContent s
 	}
 
 	insertQuery := `INSERT INTO schema_migrations (version) VALUES ($1)`
+
 	if _, err := tx.Exec(ctx, insertQuery, version); err != nil {
 		db.logger.Error("Falha ao registrar migration executada",
 			"version", version,
@@ -229,10 +239,12 @@ func executeMigration(ctx context.Context, db *PostgresDB, version, sqlContent s
 
 func (db *PostgresDB) WithTx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 	tx, err := db.Begin(ctx)
+
 	if err != nil {
 		db.logger.Error("Falha ao iniciar transação", "error", err)
 		return err
 	}
+
 	defer tx.Rollback(ctx)
 
 	if err := fn(tx); err != nil {

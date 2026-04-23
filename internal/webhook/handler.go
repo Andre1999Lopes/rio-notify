@@ -21,12 +21,12 @@ func NewWebhookHandler(service *WebhookService, log *logger.Logger) *WebhookHand
 	}
 }
 
-func (h *WebhookHandler) HandleWebhook(c *gin.Context) {
+func (handler *WebhookHandler) HandleWebhook(c *gin.Context) {
 	ctx := c.Request.Context()
-
 	var payload WebhookPayload
+
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		h.logger.Warn("Payload inválido",
+		handler.logger.Warn("Payload inválido",
 			"error", err,
 			"client_ip", c.ClientIP(),
 		)
@@ -36,15 +36,15 @@ func (h *WebhookHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	h.logger.Info("Webhook recebido",
-		"call_id", payload.ChamadoID,
+	handler.logger.Info("Webhook recebido",
+		"call_id", payload.ChamadoId,
 		"status_new", payload.StatusNovo,
-		"cpf_masked", maskCPF(payload.CPF),
+		"cpf_masked", maskCPF(payload.Cpf),
 	)
 
-	if h.service.IsDuplicate(ctx, payload.ChamadoID, payload.StatusNovo) {
-		h.logger.Info("Evento já processado (Redis)",
-			"call_id", payload.ChamadoID,
+	if handler.service.IsDuplicate(ctx, payload.ChamadoId, payload.StatusNovo) {
+		handler.logger.Info("Evento já processado (Redis)",
+			"call_id", payload.ChamadoId,
 			"status_new", payload.StatusNovo,
 		)
 		c.JSON(http.StatusOK, gin.H{
@@ -53,13 +53,13 @@ func (h *WebhookHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	err := h.service.ProcessWebhook(ctx, payload)
+	notificationId, err := handler.service.ProcessWebhook(ctx, payload)
 
 	if err != nil && errors.Is(err, ErrDuplicateEvent) {
-		h.service.MarkAsProcessed(ctx, payload.ChamadoID, payload.StatusNovo)
+		handler.service.MarkAsProcessed(ctx, payload.ChamadoId, payload.StatusNovo)
 
-		h.logger.Info("Evento já processado (banco)",
-			"call_id", payload.ChamadoID,
+		handler.logger.Info("Evento já processado (banco)",
+			"call_id", payload.ChamadoId,
 			"status_new", payload.StatusNovo,
 		)
 		c.JSON(http.StatusOK, gin.H{
@@ -69,9 +69,9 @@ func (h *WebhookHandler) HandleWebhook(c *gin.Context) {
 	}
 
 	if err != nil {
-		h.logger.Error("Falha ao processar webhook",
+		handler.logger.Error("Falha ao processar webhook",
 			"error", err,
-			"call_id", payload.ChamadoID,
+			"call_id", payload.ChamadoId,
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Falha ao processar webhook",
@@ -79,15 +79,12 @@ func (h *WebhookHandler) HandleWebhook(c *gin.Context) {
 		return
 	}
 
-	h.service.MarkAsProcessed(ctx, payload.ChamadoID, payload.StatusNovo)
-
-	go h.service.PublishToRedis(ctx, payload)
-
-	h.logger.Info("Webhook processado com sucesso",
-		"call_id", payload.ChamadoID,
+	handler.service.MarkAsProcessed(ctx, payload.ChamadoId, payload.StatusNovo)
+	go handler.service.PublishToRedis(ctx, notificationId, payload)
+	handler.logger.Info("Webhook processado com sucesso",
+		"call_id", payload.ChamadoId,
 		"status_new", payload.StatusNovo,
 	)
-
 	c.JSON(http.StatusCreated, gin.H{
 		"status": "criado",
 	})

@@ -9,6 +9,10 @@ run:
 
 restart:
     docker compose down
+    docker compose up -d
+
+restart-clean:
+    docker compose down -v
     docker compose up --build -d
 
 down:
@@ -37,6 +41,12 @@ tidy:
 
 status:
     docker compose ps
+
+token:
+    go run .\cmd\genToken\main.go
+
+hash:
+    go run .\cmd\genHash\main.go
 
 health:
     docker compose exec api sh -c "wget -q -O - http://localhost:8080/health 2>/dev/null || curl -s http://localhost:8080/health"
