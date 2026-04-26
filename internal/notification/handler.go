@@ -21,14 +21,14 @@ func NewNotificationHandler(service *NotificationService, log *logger.Logger) *N
 	}
 }
 
-func (h *NotificationHandler) ListNotifications(c *gin.Context) {
+func (handler *NotificationHandler) ListNotifications(c *gin.Context) {
 	userHash := c.GetString("user_hash")
 	page, _ := strconv.Atoi(c.DefaultQuery("pagina", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limite", "20"))
-	result, err := h.service.ListNotifications(c.Request.Context(), userHash, page, limit)
+	result, err := handler.service.ListNotifications(c.Request.Context(), userHash, page, limit)
 
 	if err != nil {
-		h.logger.Error("Falha ao listar notificações",
+		handler.logger.Error("Falha ao listar notificações",
 			"user_hash", userHash[:8]+"...",
 			"error", err,
 		)
@@ -41,13 +41,13 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
+func (handler *NotificationHandler) MarkAsRead(c *gin.Context) {
 	userHash := c.GetString("user_hash")
 	notificationId := c.Param("id")
-	updated, err := h.service.MarkAsRead(c.Request.Context(), notificationId, userHash)
+	updated, err := handler.service.MarkAsRead(c.Request.Context(), notificationId, userHash)
 
 	if err != nil {
-		h.logger.Error("Falha ao marcar notificação como lida",
+		handler.logger.Error("Falha ao marcar notificação como lida",
 			"id", notificationId,
 			"error", err,
 		)
@@ -69,12 +69,12 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	})
 }
 
-func (h *NotificationHandler) CountUnread(c *gin.Context) {
+func (handler *NotificationHandler) CountUnread(c *gin.Context) {
 	userHash := c.GetString("user_hash")
-	count, err := h.service.CountUnread(c.Request.Context(), userHash)
+	count, err := handler.service.CountUnread(c.Request.Context(), userHash)
 
 	if err != nil {
-		h.logger.Error("Falha ao contar notificações não lidas",
+		handler.logger.Error("Falha ao contar notificações não lidas",
 			"user_hash", userHash[:8]+"...",
 			"error", err,
 		)

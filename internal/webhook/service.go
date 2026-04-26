@@ -34,9 +34,6 @@ func NewWebhookService(
 
 func (service *WebhookService) IsDuplicate(ctx context.Context, callId, statusNew string) bool {
 	key := service.buildIdempotencyKey(callId, statusNew)
-	service.logger.Info("🔍 Verificando idempotência",
-		"key", key,
-	)
 	exists, err := service.redis.Exists(ctx, key)
 
 	if err != nil {
@@ -46,11 +43,6 @@ func (service *WebhookService) IsDuplicate(ctx context.Context, callId, statusNe
 		)
 		return false
 	}
-
-	service.logger.Info("🔍 Resultado Exists",
-		"key", key,
-		"exists", exists,
-	)
 
 	return exists
 }

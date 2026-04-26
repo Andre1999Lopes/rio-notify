@@ -71,13 +71,6 @@ func HmacValidation(secret string, log *logger.Logger) gin.HandlerFunc {
 		h := hmac.New(sha256.New, []byte(secret))
 		h.Write(bodyBytes)
 		expectedHash := hex.EncodeToString(h.Sum(nil))
-		log.Warn("🔍 DEBUG HMAC",
-			"received", receivedHash,
-			"expected", expectedHash,
-			"body_string", string(bodyBytes),
-			"body_length", len(bodyBytes),
-			"secret", secret,
-		)
 
 		if !hmac.Equal([]byte(receivedHash), []byte(expectedHash)) {
 			log.Warn("Assinatura HMAC inválida",

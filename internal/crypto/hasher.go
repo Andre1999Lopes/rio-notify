@@ -20,16 +20,16 @@ func NewHasher(pepper string, logger *logger.Logger) (*Hasher, error) {
 	}
 
 	logger.Info("Hasher inicializado com sucesso")
+
 	return &Hasher{
 		pepper: pepper,
 		logger: logger,
 	}, nil
 }
 
-func (h *Hasher) HashCpf(cpf string) string {
+func (hasher *Hasher) HashCpf(cpf string) string {
 	cpf = cleanCpf(cpf)
-
-	data := cpf + ":" + h.pepper
+	data := cpf + ":" + hasher.pepper
 	hash := sha256.Sum256([]byte(data))
 
 	return hex.EncodeToString(hash[:])
@@ -40,7 +40,7 @@ func cleanCpf(cpf string) string {
 	return re.ReplaceAllString(cpf, "")
 }
 
-func (h *Hasher) ValidateCpf(cpf string) bool {
+func (hasher *Hasher) ValidateCpf(cpf string) bool {
 	cleaned := cleanCpf(cpf)
 
 	if len(cleaned) != 11 {
@@ -56,19 +56,25 @@ func (h *Hasher) ValidateCpf(cpf string) bool {
 
 func validateDigits(cpf string) bool {
 	sum := 0
+
 	for i := range 9 {
 		sum += int(cpf[i]-'0') * (10 - i)
 	}
+
 	d1 := (sum * 10) % 11
+
 	if d1 == 10 {
 		d1 = 0
 	}
 
 	sum = 0
+
 	for i := range 10 {
 		sum += int(cpf[i]-'0') * (11 - i)
 	}
+
 	d2 := (sum * 10) % 11
+
 	if d2 == 10 {
 		d2 = 0
 	}
@@ -78,6 +84,7 @@ func validateDigits(cpf string) bool {
 
 func isAllSameDigits(s string) bool {
 	first := s[0]
+
 	for i := 1; i < len(s); i++ {
 		if s[i] != first {
 			return false
@@ -88,12 +95,14 @@ func isAllSameDigits(s string) bool {
 
 func MaskCpf(cpf string) string {
 	cleaned := cleanCpf(cpf)
+
 	if len(cleaned) != 11 {
 		return "***"
 	}
+
 	return "***" + cleaned[7:11]
 }
 
-func (h *Hasher) VerifyHash(cpf, hash string) bool {
-	return h.HashCpf(cpf) == hash
+func (hasher *Hasher) VerifyHash(cpf, hash string) bool {
+	return hasher.HashCpf(cpf) == hash
 }
